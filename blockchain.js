@@ -4,10 +4,11 @@ const axios = require('axios');  // Import axios for making HTTP requests
 // const secret = crypto.randomBytes(32).toString('hex');  // Generate a 256-bit secret key
 const secret = '1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef';  // Ensure this is a 32-byte hexadecimal string
 // Constructor function for Block
-function Block(index, timestamp, message, previousHash = '') {
+function Block(index, timestamp, message,recipient = 'all', previousHash = '') {
     this.index = index;  // Index of the block in the chain
     this.timestamp = timestamp;  // Timestamp of block creation
     this.message = message;  // Data/message stored in the block
+    this.recipient = recipient;  // Recipient of the message
     this.previousHash = previousHash;  // Hash of the previous block in the chain
     this.hash = this.calculateHash();  // Hash of the current block
     this.nonce = 0;  // Nonce value used for Proof of Work
@@ -109,8 +110,8 @@ Blockchain.prototype.addBlock = function(newBlock) {
 };
 
 // Prototype method to create a new block and add it to the blockchain
-Blockchain.prototype.createNewBlock = function(message) {
-    const newBlock = new Block(this.chain.length, Date.now(), message, this.getLatestBlock().hash);  // Create a new block with the given message
+Blockchain.prototype.createNewBlock = function(message, recipient = 'all') {
+    const newBlock = new Block(this.chain.length, Date.now(), message, recipient, this.getLatestBlock().hash);  // Create a new block with the given message
     newBlock.proofOfWork(this.difficulty);  // Perform proof of work with the set difficulty level
     this.chain.push(newBlock);  // Add the new block to the chain
     console.log('New block created: ' + newBlock.hash);
@@ -123,7 +124,7 @@ Blockchain.prototype.isChainValid = function() {
         const previousBlock = this.chain[i - 1];
 
         // Recreate the block as an instance of the Block class
-        const recreatedBlock = new Block(currentBlock.index, currentBlock.timestamp, currentBlock.message, currentBlock.previousHash);
+        const recreatedBlock = new Block(currentBlock.index, currentBlock.timestamp, currentBlock.message,currentBlock.recipient, currentBlock.previousHash);
         recreatedBlock.nonce = currentBlock.nonce;
         recreatedBlock.hash = currentBlock.hash;
 

@@ -69,6 +69,30 @@ app.get('/receiveMessage', (req, res) => {
     }
 });
 
+// Route to send a direct message
+app.post('/sendDirectMessage', async (req, res) => {
+    const { message, secret, recipient } = req.body;
+    const encryptedMessage = encryptMessage(message, secret);
+    myBlockchain.createNewBlock(encryptedMessage, recipient);
+    res.send({ message: 'Direct message sent and added to blockchain', encryptedMessage });
+});
+
+// Route to receive the latest direct message
+app.get('/receiveDirectMessage', (req, res) => {
+    const { secret, recipient } = req.query;
+    try {
+        const latestBlock = myBlockchain.getLatestBlock();
+        if (latestBlock.recipient === recipient) {
+            const decryptedMessage = decryptMessage(latestBlock.message, secret);
+            res.send({ message: 'Direct message received', decryptedMessage });
+        } else {
+            res.status(403).send({ error: 'You are not the intended recipient of this message.' });
+        }
+    } catch (error) {
+        res.status(400).send({ error: error.message });
+    }
+});
+
 // Route to register a new node and broadcast it to the network
 app.post('/registerNodeAndBroadcast', async (req, res) => {
     const newNodeAddress = req.body.address;  // Get the new node's address from the request body
@@ -118,5 +142,10 @@ app.get('/consensus', async (req, res) => {
 
 // Start the server on the specified port
 app.listen(port, () => {
-    console.log(`Server is running on port ${port}`);
+    if (myBlockchain.isChainValid()) {
+        console.log(`Server is running on port ${port}`);
+    } else {
+        console.error('Blockchain is invalid. Shutting down the server.');
+        process.exit(1);
+    }
 });
