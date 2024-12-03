@@ -36,12 +36,29 @@ function Blockchain() {
     this.addressData = {};  // Object to store address-related data
     this.networkNodes = [];  // Array to store network nodes
     this.currentNodeUrl = process.argv[3];
+    this.nodeNameMap = {
+        'http://localhost:3001': 'Elie',
+        'http://localhost:3002': 'Faith',
+        'http://localhost:3003': 'Maurice',
+        'http://localhost:3004': 'John',
+        'http://localhost:3005': 'Joyeuse'
+    };
+    this.currentNodeName = this.assignNodeName(this.currentNodeUrl);
+    if (this.currentNodeUrl) {
+        this.registerNode(this.currentNodeUrl); // Register the current node
+    }
 }
+
+Blockchain.prototype.assignNodeName = function (nodeUrl) {
+    return this.nodeNameMap[nodeUrl];
+};
 
 // Method to register a new node
 Blockchain.prototype.registerNode = function (nodeUrl) {
-    if (this.networkNodes.indexOf(nodeUrl) === -1 && this.currentNodeUrl !== nodeUrl) {
-        this.networkNodes.push(nodeUrl);
+    const nodeExists = this.networkNodes.some(node => node.url === nodeUrl);
+    if (!nodeExists) {
+        const nodeName = this.assignNodeName(nodeUrl);
+        this.networkNodes.push({ url: nodeUrl, name: nodeName, startTime: new Date().toISOString() });
     }
 };
 
@@ -49,18 +66,17 @@ Blockchain.prototype.registerNode = function (nodeUrl) {
 Blockchain.prototype.registerNodes = function (nodeUrls) {
     nodeUrls.forEach(nodeUrl => {
         if (this.networkNodes.indexOf(nodeUrl) === -1 && this.currentNodeUrl !== nodeUrl) {
-            this.networkNodes.push(nodeUrl);
+            this.networkNodes.push({ url: nodeUrl, startTime: new Date().toISOString() });
         }
     });
 };
 
 // Method to achieve consensus
 Blockchain.prototype.consensus = async function () {
-    const requestPromises = this.networkNodes.map(nodeUrl => {
-        return fetch(`${nodeUrl}/blockchain`, {
-            method: 'GET',
+    const requestPromises = this.networkNodes.map(node => {
+        return axios.get(`${node.url}/blockchain`, {
             headers: { 'Content-Type': 'application/json' }
-        }).then(response => response.json());
+        }).then(response => response.data);
     });
 
     const blockchains = await Promise.all(requestPromises);

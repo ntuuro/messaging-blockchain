@@ -1,9 +1,12 @@
 const express = require('express');
 const bodyParser = require('body-parser');
 const crypto = require('crypto');
+const cors = require('cors');
 const axios = require('axios'); // For making HTTP requests to other nodes
 const { Blockchain, encryptMessage, decryptMessage } = require('./blockchain');
 const port = process.argv[2]; // Dynamic port configuration
+// const WebSocket = require('ws');
+// const wss = new WebSocket.Server({ port: 8080 });
 
 // Create an instance of Blockchain
 const myBlockchain = new Blockchain();
@@ -35,6 +38,7 @@ Block.prototype.mineBlock = function(difficulty) {
 
 // Setup Express app for network node
 const app = express();
+app.use(cors());  // Enable Cross-Origin Resource Sharing
 app.use(bodyParser.json());  // Use body-parser to parse JSON bodies into JS objects
 
 // Route to get the entire blockchain
@@ -54,16 +58,27 @@ app.post('/sendMessage', (req, res) => {
     const { message, secret } = req.body;
     const encryptedMessage = encryptMessage(message, secret);
     myBlockchain.createNewBlock(encryptedMessage);
+
+    // Broadcast the message to WebSocket clients
+    // wss.clients.forEach(client => {
+    //     if (client.readyState === WebSocket.OPEN) {
+    //         client.send(JSON.stringify({ message: 'Direct message sent', encryptedMessage, recipient }));
+    //     }
+    // });
+
     res.send({ message: 'Message sent and added to blockchain', encryptedMessage });
 });
 
 // Route to receive the latest message
 app.get('/receiveMessage', (req, res) => {
-    const { secret } = req.query;
+    // const { secret } = req.query;
+    const secret = '1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef'
     try {
-        const latestBlock = myBlockchain.getLatestBlock();
-        const decryptedMessage = decryptMessage(latestBlock.message, secret);
-        res.send({ message: 'Message received', decryptedMessage });
+        const messages = myBlockchain.chain.slice(1).map(block => {
+            const decryptedMessage = decryptMessage(block.message, secret);
+            return { decryptedMessage, timestamp: block.timestamp };
+        });
+        res.send({ messages });
     } catch (error) {
         res.status(400).send({ error: error.message });
     }
@@ -93,6 +108,7 @@ app.get('/receiveDirectMessage', (req, res) => {
     }
 });
 
+
 // Route to register a new node and broadcast it to the network
 app.post('/registerNodeAndBroadcast', async (req, res) => {
     const newNodeAddress = req.body.address;  // Get the new node's address from the request body
@@ -101,7 +117,9 @@ app.post('/registerNodeAndBroadcast', async (req, res) => {
     // Broadcast the new node to all other nodes in the network
     const regNodesPromises = [];
     myBlockchain.networkNodes.forEach(node => {
-        regNodesPromises.push(axios.post(`${node}/registerNode`, { address: newNodeAddress }));
+        if (node.url) {  // Ensure the node URL is valid
+            regNodesPromises.push(axios.post(`${node.url}/registerNode`, { address: newNodeAddress }));
+        }
     });
 
     try {
@@ -139,6 +157,22 @@ app.get('/consensus', async (req, res) => {
     const result = await myBlockchain.consensus();
     res.json(result);
 });
+
+app.get('/nodes', (req, res) => {
+    res.send({ nodes: myBlockchain.networkNodes });
+});
+app.get('/currentNode', (req, res) => {
+    res.send({ currentNodeUrl: myBlockchain.currentNodeUrl, currentNodeName: myBlockchain.currentNodeName });
+});
+
+// WebSocket server for real-time communication
+// wss.on('connection', ws => {
+//     ws.on('message', message => {
+//         console.log('received: %s', message);
+//     });
+//
+//     ws.send('something');
+// });
 
 // Start the server on the specified port
 app.listen(port, () => {
